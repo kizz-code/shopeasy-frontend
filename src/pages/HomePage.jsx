@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowRight, Truck, Shield, RotateCcw, Headphones, Zap } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, Truck, Shield, RotateCcw, Headphones, Search } from 'lucide-react'
 import { productService, categoryService } from '../services/productService'
 import ProductCard from '../components/product/ProductCard'
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton'
@@ -15,17 +15,24 @@ const features = [
 export default function HomePage() {
   const [featured, setFeatured] = useState([])
   const [categories, setCategories] = useState([])
+  const [catalogueSize, setCatalogueSize] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [heroSearch, setHeroSearch] = useState('')
+  const navigate = useNavigate()
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [featuredProducts, categoryList] = await Promise.all([
+        // limit=1 because we only want the total out of the pagination block,
+        // not the products themselves.
+        const [featuredProducts, categoryList, page] = await Promise.all([
           productService.getFeatured(),
           categoryService.list(),
+          productService.list({ limit: 1 }),
         ])
         setFeatured(featuredProducts)
         setCategories(categoryList)
+        setCatalogueSize(page.pagination.totalItems)
       } catch {
         // The hero and category strip still render; the grid just stays empty.
         setFeatured([])
@@ -46,30 +53,60 @@ export default function HomePage() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/30 rounded-full px-4 py-2 mb-6">
-              <Zap size={14} className="text-brand-400" />
-              <span className="text-brand-400 text-sm font-medium">New Arrivals Every Week</span>
-            </div>
-
             <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight mb-6">
-              Shop Smart,
+              Find it fast.
               <br />
-              <span className="gradient-text">Live Well.</span>
+              <span className="gradient-text">Buy it simply.</span>
             </h1>
 
-            <p className="text-dark-400 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
-              Discover premium products across electronics, fashion, home & more. 
-              Curated quality, delivered fast.
+            {/* The counts come from the API rather than being written into the copy,
+                so the page cannot claim a catalogue it does not have. */}
+            <p className="text-dark-300 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
+              {catalogueSize
+                ? `Search ${catalogueSize} products across ${categories.length} categories.`
+                : 'Search the catalogue by name, brand or category.'}{' '}
+              Filter by price, sort how you like, and check out in two steps.
             </p>
 
-            <div className="flex flex-wrap gap-4">
-              <Link to="/products" className="btn-primary text-base py-3.5 px-8 flex items-center gap-2 group">
-                Explore Products
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const q = heroSearch.trim()
+                navigate(q ? `/products?search=${encodeURIComponent(q)}` : '/products')
+              }}
+              className="flex flex-col sm:flex-row gap-3 max-w-xl"
+            >
+              <div className="relative flex-1">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-500" />
+                <input
+                  type="search"
+                  value={heroSearch}
+                  onChange={(e) => setHeroSearch(e.target.value)}
+                  placeholder="Try headphones, Nike or Atomic Habits"
+                  aria-label="Search the catalogue"
+                  className="input-field pl-12 py-4 text-base"
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-primary text-base py-4 px-8 flex items-center justify-center gap-2 group whitespace-nowrap"
+              >
+                Search
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link to="/products?featured=true" className="btn-secondary text-base py-3.5 px-8">
-                Featured Deals
-              </Link>
+              </button>
+            </form>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-6 text-sm">
+              <span className="text-dark-500">Popular:</span>
+              {['Headphones', 'Sneakers', 'Books'].map((term) => (
+                <Link
+                  key={term}
+                  to={`/products?search=${encodeURIComponent(term)}`}
+                  className="text-dark-300 hover:text-brand-400 underline underline-offset-4 decoration-dark-600 hover:decoration-brand-400 transition-colors"
+                >
+                  {term}
+                </Link>
+              ))}
             </div>
 
           </div>
