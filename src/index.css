@@ -9,9 +9,6 @@
 
   body {
     @apply bg-dark-900 text-white font-body antialiased;
-    background-image: 
-      radial-gradient(ellipse at 20% 50%, rgba(241, 112, 35, 0.03) 0%, transparent 60%),
-      radial-gradient(ellipse at 80% 20%, rgba(241, 112, 35, 0.02) 0%, transparent 50%);
     min-height: 100vh;
   }
 
