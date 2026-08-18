@@ -14,22 +14,37 @@ const EMPTY_CART = { items: [], totalItems: 0, totalPrice: 0, hasUnavailableItem
  * with whatever the server says the cart now is.
  */
 export function CartProvider({ children }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [cart, setCart] = useState(EMPTY_CART)
   const [loading, setLoading] = useState(false)
 
+  // Starts false and only becomes true once we actually know what is in the cart.
+  // Without it, a page that redirects on an empty cart would fire on the very
+  // first render - before the request has even been sent - and bounce a user who
+  // does have items. That is what happens on a refresh of /checkout.
+  const [ready, setReady] = useState(false)
+
   useEffect(() => {
+    // Wait for the stored token to be verified, otherwise isAuthenticated is
+    // still false and we would settle on "empty cart" too early.
+    if (authLoading) return
+
     if (!isAuthenticated) {
       setCart(EMPTY_CART)
+      setReady(true)
       return
     }
+
     setLoading(true)
     cartService
       .get()
       .then(setCart)
       .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [isAuthenticated])
+      .finally(() => {
+        setLoading(false)
+        setReady(true)
+      })
+  }, [isAuthenticated, authLoading])
 
   // All four mutations do the same thing: call the API, swap in the returned cart,
   // and surface the server's message if it refused.
@@ -47,6 +62,7 @@ export function CartProvider({ children }) {
   const value = {
     cart,
     loading,
+    ready,
     addToCart: (productId, quantity = 1) =>
       run(() => cartService.add(productId, quantity), 'Added to cart'),
     updateQuantity: (productId, quantity) =>

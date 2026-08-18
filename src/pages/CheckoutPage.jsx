@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { orderService, paymentService } from '../services/orderService'
 import { formatPrice } from '../utils/format'
 import { calculatePricing } from '../utils/pricing'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const STEPS = ['Shipping', 'Payment']
 
@@ -28,7 +29,7 @@ function validateAddress(address) {
 }
 
 export default function CheckoutPage() {
-  const { cart, refreshCart } = useCart()
+  const { cart, ready: cartReady, refreshCart } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -58,6 +59,12 @@ export default function CheckoutPage() {
       .then(({ onlinePaymentEnabled }) => setOnlineEnabled(onlinePaymentEnabled))
       .catch(() => setOnlineEnabled(false))
   }, [])
+
+  // Wait until the cart has actually been fetched before deciding it is empty,
+  // otherwise a refresh on this page redirects away before the request returns.
+  if (!cartReady) {
+    return <div className="flex justify-center py-32"><LoadingSpinner size="lg" /></div>
+  }
 
   if (cart.items.length === 0 && !placing) {
     return <Navigate to="/cart" replace />

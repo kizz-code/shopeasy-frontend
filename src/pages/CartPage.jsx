@@ -8,10 +8,10 @@ import ProductImage from '../components/common/ProductImage'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
 export default function CartPage() {
-  const { cart, loading, updateQuantity, removeFromCart, clearCart } = useCart()
+  const { cart, ready: cartReady, updateQuantity, removeFromCart, clearCart } = useCart()
   const navigate = useNavigate()
 
-  if (loading && cart.items.length === 0) {
+  if (!cartReady) {
     return <div className="flex justify-center py-32"><LoadingSpinner size="lg" /></div>
   }
 
