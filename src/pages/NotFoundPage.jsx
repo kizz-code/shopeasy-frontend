@@ -43,7 +43,7 @@ export default function NotFoundPage() {
           Looks like this page wandered off somewhere.
         </p>
         <p className="text-dark-600 text-sm mb-10">
-          The page you're looking for doesn't exist or has been moved.
+          The page you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
 
         {/* Actions */}

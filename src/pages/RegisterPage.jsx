@@ -2,12 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Phone, UserPlus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useCart } from '../context/CartContext'
 import toast from 'react-hot-toast'
 
 export default function RegisterPage() {
   const { register } = useAuth()
-  const { fetchCart } = useCart()
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', phone: '' })
   const [showPass, setShowPass] = useState(false)
@@ -33,11 +31,16 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      await register(form.name, form.email, form.password, form.phone)
-      await fetchCart()
+      const user = await register({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        phone: form.phone || undefined,
+      })
+      toast.success(`Welcome to ShopEasy, ${user.name}!`)
       navigate('/', { replace: true })
     } catch (err) {
-      toast.error(err.message || 'Registration failed')
+      toast.error(err.message)
     } finally {
       setLoading(false)
     }

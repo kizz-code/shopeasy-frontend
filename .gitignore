@@ -1,3 +1,8 @@
 node_modules/
+dist/
 .env
 .env.local
+
+# Keep the templates tracked
+!.env.example
+!.env.production

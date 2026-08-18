@@ -22,11 +22,18 @@ export default {
           900: "#782c18",
           950: "#41130a",
         },
+        // 900 is the page background and it gets lighter from there: 800/700 are
+        // surfaces, 600/500 are borders, 400-100 are text shades.
         dark: {
           900: "#0a0a0f",
           800: "#12121a",
           700: "#1a1a27",
           600: "#22223a",
+          500: "#4a4a63",
+          400: "#8e8ea8",
+          300: "#b8b8cc",
+          200: "#d8d8e4",
+          100: "#eeeef4",
         },
       },
       animation: {

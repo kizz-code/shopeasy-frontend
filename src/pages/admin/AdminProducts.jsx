@@ -1,338 +1,390 @@
-import { useState, useEffect, useCallback } from 'react';
-import api from '../../services/api';
-import toast from 'react-hot-toast';
-import {
-  Plus, Search, Edit2, Trash2, X, Image as ImageIcon,
-  ChevronLeft, ChevronRight, Package,
-} from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react'
+import toast from 'react-hot-toast'
+import { Search, Plus, Pencil, Trash2, X } from 'lucide-react'
+import { productService, categoryService } from '../../services/productService'
+import useDebounce from '../../hooks/useDebounce'
+import { formatPrice, primaryImage } from '../../utils/format'
+import ProductImage from '../../components/common/ProductImage'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
 
-const EMPTY_FORM = {
-  name: '', description: '', price: '', originalPrice: '',
-  category: '', brand: '', stock: '', images: [''],
-  isFeatured: false,
-};
+const blankProduct = {
+  name: '', description: '', price: '', discountedPrice: '',
+  category: '', brand: '', stock: '', imageUrl: '', isFeatured: false,
+}
 
-function ProductModal({ product, onClose, onSave }) {
-  const [form, setForm] = useState(product ? { ...product, images: product.images?.length ? product.images : [''] } : { ...EMPTY_FORM });
-  const [saving, setSaving] = useState(false);
+export default function AdminProducts() {
+  const [products, setProducts] = useState([])
+  const [pagination, setPagination] = useState(null)
+  const [categories, setCategories] = useState([])
+  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
+  const search = useDebounce(searchInput, 400)
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name || !form.price || !form.stock) {
-      toast.error('Name, price, and stock are required.');
-      return;
-    }
-    setSaving(true);
+  useEffect(() => {
+    categoryService.list().then(setCategories).catch(() => setCategories([]))
+  }, [])
+
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
-      const payload = {
-        ...form,
-        price: Number(form.price),
-        originalPrice: form.originalPrice ? Number(form.originalPrice) : undefined,
-        stock: Number(form.stock),
-        images: form.images.filter(Boolean),
-      };
-      if (product?._id) {
-        const { data } = await api.put(`/products/${product._id}`, payload);
-        onSave(data.product || data, 'edit');
-      } else {
-        const { data } = await api.post('/products', payload);
-        onSave(data.product || data, 'create');
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save product.');
+      const result = await productService.list({
+        page, limit: 12, ...(search.trim() && { search: search.trim() }),
+      })
+      setProducts(result.products)
+      setPagination(result.pagination)
+    } catch (error) {
+      toast.error(error.message)
     } finally {
-      setSaving(false);
+      setLoading(false)
     }
-  };
+  }, [page, search])
 
-  const addImageField = () => setForm({ ...form, images: [...form.images, ''] });
-  const updateImage  = (i, v) => {
-    const imgs = [...form.images];
-    imgs[i] = v;
-    setForm({ ...form, images: imgs });
-  };
-  const removeImage  = (i) => setForm({ ...form, images: form.images.filter((_, idx) => idx !== i) });
+  useEffect(() => { load() }, [load])
+  useEffect(() => { setPage(1) }, [search])
+
+  const remove = async (product) => {
+    if (!window.confirm(`Remove "${product.name}" from the store?`)) return
+    try {
+      await productService.remove(product._id)
+      toast.success('Product removed')
+      load()
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-dark-800 border border-dark-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-dark-700 sticky top-0 bg-dark-800 z-10">
-          <h2 className="text-lg font-bold text-white">
-            {product ? 'Edit Product' : 'Add New Product'}
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Products</h1>
+          <p className="text-dark-400 text-sm mt-1">{pagination?.totalItems ?? 0} live products</p>
+        </div>
+        <button onClick={() => setEditing({ ...blankProduct })} className="btn-primary flex items-center gap-2">
+          <Plus size={16} />
+          New product
+        </button>
+      </header>
+
+      <div className="relative">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dark-500" />
+        <input
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search products…"
+          aria-label="Search products"
+          className="input-field pl-10 text-sm"
+        />
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
+      ) : products.length === 0 ? (
+        <EmptyState title="No products found" message="Try a different search, or add a new product." />
+      ) : (
+        <>
+          <div className="glass-card overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="border-b border-dark-600 text-dark-400 text-xs uppercase tracking-wide">
+                  <th className="text-left font-medium px-4 py-3">Product</th>
+                  <th className="text-left font-medium px-4 py-3">Category</th>
+                  <th className="text-right font-medium px-4 py-3">Price</th>
+                  <th className="text-right font-medium px-4 py-3">Stock</th>
+                  <th className="text-right font-medium px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-600">
+                {products.map((product) => (
+                  <tr key={product._id} className="hover:bg-dark-700/40 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <ProductImage
+                          src={primaryImage(product)}
+                          alt={product.name}
+                          className="w-10 h-10 rounded-lg object-cover border border-dark-600 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-white line-clamp-1">{product.name}</p>
+                          <p className="text-dark-500 text-xs">{product.brand || '—'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-dark-300">{product.category?.name || '—'}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <span className="text-white">
+                        {formatPrice(product.discountedPrice > 0 ? product.discountedPrice : product.price)}
+                      </span>
+                      {product.discountedPrice > 0 && (
+                        <span className="block text-dark-500 text-xs line-through">
+                          {formatPrice(product.price)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={product.stock === 0 ? 'text-red-400' : product.stock < 10 ? 'text-amber-400' : 'text-dark-300'}>
+                        {product.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setEditing(toFormValues(product))}
+                          aria-label={`Edit ${product.name}`}
+                          className="p-2 text-dark-400 hover:text-brand-400 transition-colors"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => remove(product)}
+                          aria-label={`Delete ${product.name}`}
+                          className="p-2 text-dark-400 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination pagination={pagination} onPageChange={setPage} />
+        </>
+      )}
+
+      {editing && (
+        <ProductForm
+          initial={editing}
+          categories={categories}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// The form works with plain strings and a single image URL; this flattens a product
+// from the API into that shape.
+function toFormValues(product) {
+  return {
+    _id: product._id,
+    name: product.name,
+    description: product.description,
+    price: String(product.price),
+    discountedPrice: product.discountedPrice ? String(product.discountedPrice) : '',
+    category: product.category?._id || '',
+    brand: product.brand || '',
+    stock: String(product.stock),
+    imageUrl: primaryImage(product),
+    isFeatured: product.isFeatured,
+  }
+}
+
+function ProductForm({ initial, categories, onClose, onSaved }) {
+  const [form, setForm] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }))
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setFieldErrors({})
+
+    const payload = {
+      name: form.name,
+      description: form.description,
+      price: Number(form.price),
+      discountedPrice: form.discountedPrice ? Number(form.discountedPrice) : 0,
+      category: form.category,
+      brand: form.brand,
+      stock: Number(form.stock),
+      isFeatured: form.isFeatured,
+      images: form.imageUrl ? [{ url: form.imageUrl, alt: form.name, isPrimary: true }] : [],
+    }
+
+    try {
+      if (form._id) {
+        await productService.update(form._id, payload)
+        toast.success('Product updated')
+      } else {
+        await productService.create(payload)
+        toast.success('Product created')
+      }
+      onSaved()
+    } catch (error) {
+      // The API returns per-field messages for validation failures; show them
+      // next to the inputs rather than in a toast.
+      if (error.errors) {
+        setFieldErrors(Object.fromEntries(error.errors.map((e) => [e.field, e.message])))
+      }
+      toast.error(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-dark-900/80 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+      <div className="glass-card w-full max-w-2xl my-8">
+        <div className="flex items-center justify-between p-5 border-b border-dark-600">
+          <h2 className="font-bold text-white text-lg">
+            {form._id ? 'Edit product' : 'New product'}
           </h2>
-          <button onClick={onClose} className="text-dark-400 hover:text-white transition-colors p-1">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} aria-label="Close" className="text-dark-400 hover:text-white p-1">
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={submit} className="p-5 space-y-4">
+          <FormField label="Name" error={fieldErrors.name}>
+            <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input-field" required />
+          </FormField>
+
+          <FormField label="Description" error={fieldErrors.description}>
+            <textarea
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
+              rows={3}
+              className="input-field resize-y"
+              required
+            />
+          </FormField>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-dark-400 mb-1.5">Product Name *</label>
-              <input type="text" className="input-field w-full" value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Enter product name" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1.5">Price (₹) *</label>
-              <input type="number" className="input-field w-full" value={form.price} min={0}
-                onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="999" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1.5">Original Price (₹)</label>
-              <input type="number" className="input-field w-full" value={form.originalPrice} min={0}
-                onChange={(e) => setForm({ ...form, originalPrice: e.target.value })} placeholder="1299" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1.5">Category</label>
-              <input type="text" className="input-field w-full" value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Electronics" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1.5">Brand</label>
-              <input type="text" className="input-field w-full" value={form.brand}
-                onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Apple" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-400 mb-1.5">Stock *</label>
-              <input type="number" className="input-field w-full" value={form.stock} min={0}
-                onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="100" />
-            </div>
-            <div className="flex items-center gap-3 pt-5">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.isFeatured}
-                  onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
-                  className="w-4 h-4 accent-brand-500" />
-                <span className="text-sm text-dark-300">Featured Product</span>
-              </label>
-            </div>
+            <FormField label="Category" error={fieldErrors.category}>
+              <select value={form.category} onChange={(e) => set('category', e.target.value)} className="input-field cursor-pointer" required>
+                <option value="">Choose a category</option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Brand">
+              <input value={form.brand} onChange={(e) => set('brand', e.target.value)} className="input-field" />
+            </FormField>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-dark-400 mb-1.5">Description</label>
-            <textarea className="input-field w-full resize-none" rows={3} value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Product description..." />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <FormField label="Price (₹)" error={fieldErrors.price}>
+              <input type="number" min="0" value={form.price} onChange={(e) => set('price', e.target.value)} className="input-field" required />
+            </FormField>
+
+            <FormField label="Sale price (₹)" error={fieldErrors.discountedPrice}>
+              <input type="number" min="0" value={form.discountedPrice} onChange={(e) => set('discountedPrice', e.target.value)} className="input-field" placeholder="Optional" />
+            </FormField>
+
+            <FormField label="Stock" error={fieldErrors.stock}>
+              <input type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} className="input-field" required />
+            </FormField>
           </div>
 
-          {/* Image URLs */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-dark-400">Image URLs</label>
-              <button type="button" onClick={addImageField}
-                className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
-                <Plus className="w-3 h-3" /> Add
-              </button>
-            </div>
-            <div className="space-y-2">
-              {form.images.map((img, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <div className="w-8 h-8 rounded border border-dark-700 bg-dark-800 flex-shrink-0 overflow-hidden">
-                    {img ? (
-                      <img src={img} alt="" className="w-full h-full object-cover"
-                        onError={(e) => { e.target.style.display = 'none'; }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="w-3.5 h-3.5 text-dark-600" />
-                      </div>
-                    )}
-                  </div>
-                  <input type="url" className="input-field flex-1 text-sm" value={img}
-                    onChange={(e) => updateImage(i, e.target.value)}
-                    placeholder="https://example.com/image.jpg" />
-                  {form.images.length > 1 && (
-                    <button type="button" onClick={() => removeImage(i)}
-                      className="text-dark-500 hover:text-red-400 transition-colors p-1">
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <FormField label="Image URL">
+            <input
+              value={form.imageUrl}
+              onChange={(e) => set('imageUrl', e.target.value)}
+              className="input-field"
+              placeholder="https://…"
+            />
+            <ImagePreview url={form.imageUrl} />
+          </FormField>
+
+          <label className="flex items-center gap-2 text-sm text-dark-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isFeatured}
+              onChange={(e) => set('isFeatured', e.target.checked)}
+              className="accent-brand-500 w-4 h-4"
+            />
+            Show on the homepage
+          </label>
 
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-60">
-              {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              {product ? 'Update Product' : 'Create Product'}
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? 'Saving…' : form._id ? 'Save changes' : 'Create product'}
             </button>
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           </div>
         </form>
       </div>
     </div>
-  );
+  )
 }
 
-export default function AdminProducts() {
-  const [products, setProducts]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
-  const [page, setPage]           = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [modalProduct, setModalProduct] = useState(undefined); // undefined=closed, null=new, obj=edit
-  const LIMIT = 10;
+/**
+ * Loads the pasted URL and reports what happened.
+ *
+ * The usual mistake is pasting the page a photo sits on rather than the photo
+ * itself - an Unsplash photo page instead of the images.unsplash.com file. Both
+ * look like a link, but only one is an image. Showing the result while the form
+ * is still open means that gets caught before the product is saved.
+ */
+function ImagePreview({ url }) {
+  const trimmed = url?.trim()
+  const [status, setStatus] = useState('idle')
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get(
-        `/products?page=${page}&limit=${LIMIT}&search=${encodeURIComponent(search)}`
-      );
-      setProducts(data.products || data || []);
-      setTotalPages(data.totalPages || 1);
-    } catch {
-      toast.error('Failed to load products.');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!trimmed) {
+      setStatus('idle')
+      return
     }
-  }, [page, search]);
+    setStatus('loading')
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+    // Loading it in a detached Image is the only reliable way to know whether a
+    // URL really resolves to an image; a HEAD request would be blocked by CORS.
+    const img = new Image()
+    let cancelled = false
+    img.onload = () => !cancelled && setStatus('ok')
+    img.onerror = () => !cancelled && setStatus('error')
+    img.src = trimmed
 
-  const handleSearch = (e) => { setSearch(e.target.value); setPage(1); };
+    return () => { cancelled = true }
+  }, [trimmed])
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this product? This action cannot be undone.')) return;
-    try {
-      await api.delete(`/products/${id}`);
-      toast.success('Product deleted.');
-      fetchProducts();
-    } catch {
-      toast.error('Failed to delete product.');
-    }
-  };
+  if (status === 'idle') {
+    return (
+      <p className="text-dark-500 text-xs mt-1.5">
+        Paste a direct link to an image file, not the page it appears on.
+      </p>
+    )
+  }
 
-  const handleSave = (saved, action) => {
-    toast.success(action === 'create' ? 'Product created!' : 'Product updated!');
-    setModalProduct(undefined);
-    fetchProducts();
-  };
+  if (status === 'loading') {
+    return <p className="text-dark-400 text-xs mt-1.5">Checking image…</p>
+  }
+
+  if (status === 'error') {
+    return (
+      <p className="text-amber-400 text-xs mt-1.5">
+        That link did not load as an image. It is usually the page the photo sits on
+        rather than the file itself — open the image directly and copy that URL.
+      </p>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-dark-900 py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              <span className="gradient-text">Products</span> Management
-            </h1>
-            <p className="text-dark-400 text-sm mt-0.5">Manage your product catalogue</p>
-          </div>
-          <button onClick={() => setModalProduct(null)} className="btn-primary flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Product
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-5 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-500" />
-          <input type="text" className="input-field w-full pl-9 text-sm" placeholder="Search products..."
-            value={search} onChange={handleSearch} />
-        </div>
-
-        {/* Table */}
-        <div className="glass-card overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
-            </div>
-          ) : products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-dark-500">
-              <Package className="w-10 h-10 mb-3" />
-              <p>No products found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-dark-700 bg-dark-800/50">
-                    {['Product', 'Category', 'Price', 'Stock', 'Featured', 'Actions'].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-dark-500 uppercase tracking-wide">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-dark-800">
-                  {products.map((p) => (
-                    <tr key={p._id} className="hover:bg-dark-800/40 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <img src={p.images?.[0] || '/placeholder.png'} alt={p.name}
-                            className="w-10 h-10 rounded-lg object-cover border border-dark-700 flex-shrink-0" />
-                          <div>
-                            <p className="text-white font-medium line-clamp-1 max-w-[180px]">{p.name}</p>
-                            <p className="text-dark-500 text-xs">{p.brand || '—'}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="badge text-xs">{p.category || '—'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-brand-400 font-semibold">₹{p.price?.toLocaleString()}</p>
-                        {p.originalPrice > p.price && (
-                          <p className="text-dark-600 text-xs line-through">₹{p.originalPrice?.toLocaleString()}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium ${p.stock > 10 ? 'text-green-400' : p.stock > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {p.stock > 0 ? p.stock : 'Out of stock'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs ${p.isFeatured ? 'text-brand-400' : 'text-dark-600'}`}>
-                          {p.isFeatured ? '★ Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button onClick={() => setModalProduct(p)}
-                            className="p-1.5 text-dark-400 hover:text-brand-400 transition-colors rounded-lg hover:bg-brand-500/10">
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => handleDelete(p._id)}
-                            className="p-1.5 text-dark-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-dark-700">
-              <p className="text-xs text-dark-500">Page {page} of {totalPages}</p>
-              <div className="flex gap-2">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-700 text-dark-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-700 text-dark-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Modal */}
-        {modalProduct !== undefined && (
-          <ProductModal
-            product={modalProduct}
-            onClose={() => setModalProduct(undefined)}
-            onSave={handleSave}
-          />
-        )}
-      </div>
+    <div className="flex items-center gap-2 mt-2">
+      <img src={trimmed} alt="Preview" className="w-16 h-16 rounded-lg object-cover border border-dark-600" />
+      <span className="text-green-400 text-xs">Image loads correctly</span>
     </div>
-  );
+  )
+}
+
+function FormField({ label, error, children }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-dark-300 mb-1.5">{label}</label>
+      {children}
+      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+    </div>
+  )
 }

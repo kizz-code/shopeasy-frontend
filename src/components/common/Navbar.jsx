@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { ShoppingCart, User, Menu, X, Search, Shield, LogOut, Package } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
+import useClickOutside from '../../hooks/useClickOutside'
 
 export default function Navbar() {
   const { isAuthenticated, isAdmin, user, logout } = useAuth()
@@ -11,6 +12,9 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [search, setSearch] = useState('')
+
+  const closeUserMenu = useCallback(() => setUserMenuOpen(false), [])
+  const userMenuRef = useClickOutside(closeUserMenu)
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -44,13 +48,13 @@ export default function Navbar() {
           <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex">
             <div className="relative w-full">
               <input
-                type="text"
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products..."
-                className="w-full bg-dark-700 border border-dark-600 rounded-xl pl-4 pr-12 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition-all"
+                placeholder="Search products…"
+                className="w-full bg-dark-700 border border-dark-600 rounded-xl pl-4 pr-12 py-2.5 text-sm text-white placeholder-dark-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30 transition-all"
               />
-              <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-400 transition-colors">
+              <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-400 hover:text-brand-400 transition-colors">
                 <Search size={18} />
               </button>
             </div>
@@ -60,7 +64,7 @@ export default function Navbar() {
           <nav className="hidden md:flex items-center gap-1">
             <NavLink to="/products" className={({ isActive }) =>
               `px-4 py-2 rounded-lg text-sm font-medium transition-colors
-              ${isActive ? 'text-brand-400 bg-brand-500/10' : 'text-gray-300 hover:text-white hover:bg-dark-700'}`
+              ${isActive ? 'text-brand-400 bg-brand-500/10' : 'text-dark-200 hover:text-white hover:bg-dark-700'}`
             }>
               Products
             </NavLink>
@@ -68,7 +72,7 @@ export default function Navbar() {
             {isAdmin && (
               <NavLink to="/admin" className={({ isActive }) =>
                 `flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                ${isActive ? 'text-brand-400 bg-brand-500/10' : 'text-gray-300 hover:text-white hover:bg-dark-700'}`
+                ${isActive ? 'text-brand-400 bg-brand-500/10' : 'text-dark-200 hover:text-white hover:bg-dark-700'}`
               }>
                 <Shield size={15} />
                 Admin
@@ -76,7 +80,7 @@ export default function Navbar() {
             )}
 
             {/* Cart */}
-            <Link to="/cart" className="relative p-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-dark-700 transition-colors">
+            <Link to="/cart" className="relative p-2.5 rounded-lg text-dark-200 hover:text-white hover:bg-dark-700 transition-colors">
               <ShoppingCart size={20} />
               {cart.totalItems > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-brand-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-scale-in">
@@ -87,9 +91,12 @@ export default function Navbar() {
 
             {/* User Menu */}
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  onClick={() => setUserMenuOpen((open) => !open)}
+                  aria-haspopup="menu"
+                  aria-expanded={userMenuOpen}
+                  aria-label="Account menu"
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-700 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-brand-500/20 border border-brand-500/40 flex items-center justify-center">
@@ -103,15 +110,15 @@ export default function Navbar() {
                   <div className="absolute right-0 top-full mt-2 w-52 glass-card shadow-2xl animate-slide-down overflow-hidden">
                     <div className="px-4 py-3 border-b border-dark-600">
                       <p className="font-semibold text-white text-sm">{user?.name}</p>
-                      <p className="text-gray-400 text-xs truncate">{user?.email}</p>
+                      <p className="text-dark-400 text-xs truncate">{user?.email}</p>
                     </div>
                     <div className="py-2">
                       <Link to="/profile" onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-dark-700 transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-dark-200 hover:text-white hover:bg-dark-700 transition-colors">
                         <User size={16} /> My Profile
                       </Link>
                       <Link to="/orders" onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-dark-700 transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-dark-200 hover:text-white hover:bg-dark-700 transition-colors">
                         <Package size={16} /> My Orders
                       </Link>
                       <hr className="border-dark-600 my-1" />
@@ -131,7 +138,7 @@ export default function Navbar() {
           </nav>
 
           {/* Mobile toggle */}
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-gray-300">
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-dark-200">
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -143,24 +150,24 @@ export default function Navbar() {
           <div className="px-4 py-4 space-y-3">
             <form onSubmit={handleSearch} className="flex gap-2">
               <input
-                type="text"
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products..."
+                placeholder="Search products…"
                 className="input-field text-sm py-2"
               />
               <button type="submit" className="btn-primary py-2 px-4 text-sm">
                 <Search size={16} />
               </button>
             </form>
-            <Link to="/products" onClick={() => setMobileOpen(false)} className="block py-2 text-gray-300">Products</Link>
-            <Link to="/cart" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-2 text-gray-300">
+            <Link to="/products" onClick={() => setMobileOpen(false)} className="block py-2 text-dark-200">Products</Link>
+            <Link to="/cart" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-2 text-dark-200">
               Cart {cart.totalItems > 0 && <span className="badge bg-brand-500/20 text-brand-400">{cart.totalItems}</span>}
             </Link>
             {isAuthenticated ? (
               <>
-                <Link to="/orders" onClick={() => setMobileOpen(false)} className="block py-2 text-gray-300">Orders</Link>
-                <Link to="/profile" onClick={() => setMobileOpen(false)} className="block py-2 text-gray-300">Profile</Link>
+                <Link to="/orders" onClick={() => setMobileOpen(false)} className="block py-2 text-dark-200">Orders</Link>
+                <Link to="/profile" onClick={() => setMobileOpen(false)} className="block py-2 text-dark-200">Profile</Link>
                 {isAdmin && <Link to="/admin" onClick={() => setMobileOpen(false)} className="block py-2 text-brand-400">Admin Dashboard</Link>}
                 <button onClick={handleLogout} className="block py-2 text-red-400">Logout</button>
               </>

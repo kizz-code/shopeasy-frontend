@@ -1,16 +1,23 @@
-import { useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, ShoppingBag } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useCart } from '../context/CartContext'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const { fetchCart } = useCart()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  // ProtectedRoute stores where the user was headed, so we can send them back
+  // there instead of dumping them on the homepage.
   const from = location.state?.from || '/'
+
+  // The axios interceptor redirects here with ?expired=1 when a token stops working.
+  useEffect(() => {
+    if (searchParams.get('expired')) toast.error('Your session expired. Please log in again.')
+  }, [searchParams])
 
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
@@ -33,10 +40,10 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const user = await login(form.email, form.password)
-      await fetchCart()
+      toast.success(`Welcome back, ${user.name}!`)
       navigate(user.role === 'admin' ? '/admin' : from, { replace: true })
     } catch (err) {
-      toast.error(err.message || 'Login failed')
+      toast.error(err.message)
     } finally {
       setLoading(false)
     }
@@ -125,7 +132,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-gray-400 mt-6 text-sm">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link to="/register" className="text-brand-400 hover:text-brand-300 font-medium transition-colors">
             Create one free
           </Link>

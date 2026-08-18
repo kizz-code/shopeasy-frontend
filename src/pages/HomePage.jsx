@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Truck, Shield, RotateCcw, Headphones, Zap } from 'lucide-react'
-import api from '../services/api'
+import { productService, categoryService } from '../services/productService'
 import ProductCard from '../components/product/ProductCard'
-import LoadingSpinner from '../components/common/LoadingSpinner'
+import ProductCardSkeleton from '../components/product/ProductCardSkeleton'
 
 const features = [
   { icon: Truck, title: 'Free Shipping', desc: 'On orders above ₹500' },
-  { icon: Shield, title: 'Secure Payments', desc: 'Razorpay protected' },
+  { icon: Shield, title: 'Secure Checkout', desc: 'Your data stays yours' },
   { icon: RotateCcw, title: 'Easy Returns', desc: '7-day return policy' },
   { icon: Headphones, title: '24/7 Support', desc: 'Always here to help' },
 ]
@@ -20,14 +20,15 @@ export default function HomePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [featuredRes, catRes] = await Promise.all([
-          api.get('/products/featured'),
-          api.get('/categories'),
+        const [featuredProducts, categoryList] = await Promise.all([
+          productService.getFeatured(),
+          categoryService.list(),
         ])
-        setFeatured(featuredRes.data.data.products)
-        setCategories(catRes.data.data.categories)
-      } catch (err) {
-        console.error(err)
+        setFeatured(featuredProducts)
+        setCategories(categoryList)
+      } catch {
+        // The hero and category strip still render; the grid just stays empty.
+        setFeatured([])
       } finally {
         setLoading(false)
       }
@@ -56,7 +57,7 @@ export default function HomePage() {
               <span className="gradient-text">Live Well.</span>
             </h1>
 
-            <p className="text-gray-400 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
+            <p className="text-dark-400 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
               Discover premium products across electronics, fashion, home & more. 
               Curated quality, delivered fast.
             </p>
@@ -71,19 +72,6 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Stats */}
-            <div className="flex flex-wrap gap-8 mt-12 pt-8 border-t border-dark-600">
-              {[
-                { num: '10K+', label: 'Products' },
-                { num: '50K+', label: 'Happy Customers' },
-                { num: '4.9★', label: 'Avg Rating' },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <p className="text-2xl font-bold text-white font-display">{stat.num}</p>
-                  <p className="text-gray-400 text-sm">{stat.label}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -99,7 +87,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="font-semibold text-white text-sm">{title}</p>
-                  <p className="text-gray-400 text-xs">{desc}</p>
+                  <p className="text-dark-400 text-xs">{desc}</p>
                 </div>
               </div>
             ))}
@@ -110,18 +98,14 @@ export default function HomePage() {
       {/* Categories */}
       {categories.length > 0 && (
         <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <p className="text-brand-400 text-sm font-medium uppercase tracking-widest mb-2">Browse</p>
-              <h2 className="font-display text-3xl md:text-4xl font-bold text-white">Shop by Category</h2>
-            </div>
-            <Link to="/products" className="text-brand-400 hover:text-brand-300 text-sm font-medium flex items-center gap-1 transition-colors">
-              All categories <ArrowRight size={15} />
-            </Link>
+          {/* Every category is shown below, so this header needs no "see all" link. */}
+          <div className="mb-10">
+            <p className="text-brand-400 text-sm font-medium uppercase tracking-widest mb-2">Browse</p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-white">Shop by Category</h2>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {categories.slice(0, 5).map((cat) => (
+            {categories.map((cat) => (
               <Link key={cat._id} to={`/products?category=${cat._id}`}
                 className="group glass-card p-6 text-center hover:border-brand-500/40 transition-all duration-300 hover:-translate-y-1">
                 {cat.image && (
@@ -146,17 +130,11 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {featured.map((product) => (
-              <ProductCard key={product._id} product={product} />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {loading
+            ? Array.from({ length: 4 }, (_, i) => <ProductCardSkeleton key={i} />)
+            : featured.map((product) => <ProductCard key={product._id} product={product} />)}
+        </div>
 
         <div className="text-center mt-12">
           <Link to="/products" className="btn-secondary text-base py-3.5 px-8 inline-flex items-center gap-2">
@@ -171,9 +149,9 @@ export default function HomePage() {
           <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to start shopping?
           </h2>
-          <p className="text-gray-400 mb-8">Join thousands of happy customers. Sign up and get ₹200 off your first order.</p>
+          <p className="text-dark-400 mb-8">Create an account to save your cart and track your orders.</p>
           <Link to="/register" className="btn-primary text-base py-3.5 px-10">
-            Create Free Account
+            Create an account
           </Link>
         </div>
       </section>
